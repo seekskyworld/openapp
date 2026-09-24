@@ -1,7 +1,7 @@
 {
   "name": "openapp-portal",
   "engines": {
-    "node": ">=24"
+    "node": "^24.15.0 || >=26.0.0"
   },
   "license": "Apache-2.0",
   "private": true,
@@ -24,11 +24,11 @@
   },
   "devDependencies": {
     "@openapp/contracts": "file:../packages/contracts",
-    "@types/jsdom": "^21.1.7",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.2",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
-    "jsdom": "^26.1.0",
+    "jsdom": "^30.1.0",
     "tsx": "^4.23.15"
   }
 }
