@@ -28,12 +28,12 @@
     "@openapp/contracts": "file:../packages/contracts",
     "@openapp/container-runtime": "file:./runtime",
     "busboy": "^1.6.0",
-    "pg": "^8.13.1"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^22.10.2",
-    "@types/pg": "^8.11.10",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
