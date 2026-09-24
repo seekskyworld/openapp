@@ -13,7 +13,8 @@
     简体中文 · <a href="README.md">English</a> ·
     <a href="docs/README.md">文档</a> ·
     <a href="docs/adapter-tutorial.md">接入你的应用</a> ·
-    <a href="CONTRIBUTING.md">参与贡献</a>
+    <a href="CONTRIBUTING.md">参与贡献</a> ·
+    <a href="#links">Links</a>
   </p>
 </div>
 

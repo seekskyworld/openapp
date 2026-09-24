@@ -14,7 +14,8 @@
     <a href="docs/README.en.md">Docs</a> ·
     <a href="docs/getting-started.en.md">Getting started</a> ·
     <a href="CONTRIBUTING.md">Contributing</a> ·
-    <a href="docs/support-matrix.en.md">Support matrix</a>
+    <a href="docs/support-matrix.en.md">Support matrix</a> ·
+    <a href="#links">Links</a>
   </p>
 </div>
 
