@@ -1,6 +1,6 @@
 # Contributing
 
-Use Node.js 24 LTS (`.node-version`), npm and Docker Engine/OrbStack. Install dependencies with `npm ci` at the root, then in `backend/runtime`, `backend` and `frontend`. The contracts compiler is provided by the root lockfile.
+Use the latest Node.js 24 LTS patch (`.node-version`; at least 24.15.0 for frontend tests), npm and Docker Engine/OrbStack. Install dependencies with `npm ci` at the root, then in `backend/runtime`, `backend` and `frontend`. The contracts compiler is provided by the root lockfile.
 
 See [local development and tests](docs/local-development.md) for runtime profiles and commands, the [support matrix](docs/support-matrix.en.md) for tested versions, or the [English documentation index](docs/README.en.md) for application integration and deployment guides.
 

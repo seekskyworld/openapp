@@ -8,7 +8,7 @@ versions used for every composed release.
 | ------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | Core               | 0.1.x development line                                        | Public contracts are versioned independently from implementation files.                                                      |
 | Contracts SDK      | 0.2.x                                                         | Adapters should declare the tested Core/contracts range in their manifest.                                                   |
-| Node.js            | 24 LTS                                                        | Used by local development and CI. Other versions are unsupported unless tested separately.                                   |
+| Node.js            | 24 LTS (24.15.0 or newer)                                     | Used by local development and CI; frontend test dependencies require at least 24.15.0. Other release lines are not the tested baseline. |
 | PostgreSQL         | 17                                                            | Migrations are tested on disposable PostgreSQL 17; production backups and restore drills remain deployment responsibilities. |
 | Execution runtime  | Docker Engine and OrbStack                                    | Provider and runtime access is privileged; do not expose the Docker control endpoint publicly.                               |
 | Workspace shape    | One application container and one HTTP entry per workspace    | Arbitrary multi-container application stacks are outside the current contract.                                               |
