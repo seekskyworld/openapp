@@ -1,0 +1,5 @@
+{
+  "channel": "dev",
+  "deployment": "local",
+  "runtime": "docker"
+}

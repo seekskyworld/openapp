@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [],
+  "files": [
+    "src/server-generic.ts",
+    "src/migrate-generic.ts"
+  ]
+}

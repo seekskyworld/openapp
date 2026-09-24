@@ -1,0 +1,24 @@
+{
+  "name": "@example/sample-adapter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@openapp/contracts": "^0.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

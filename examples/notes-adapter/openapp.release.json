@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "defaultAppId": "notes-demo",
+  "compatibilityMode": false,
+  "plugins": [{ "id": "notes-demo", "source": ".", "version": "1.0.0" }]
+}

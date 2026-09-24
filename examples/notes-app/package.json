@@ -1,0 +1,13 @@
+{
+  "name": "openapp-notes-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node backend/server.mjs"
+  }
+}

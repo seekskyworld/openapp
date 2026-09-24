@@ -1,0 +1,27 @@
+name: Bug report
+description: Report a reproducible Core problem using synthetic data.
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities use private security reporting. Never upload credentials, database dumps, personal accounts or private hostnames."
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions and deployment
+      description: Core commit/release fingerprint, Adapter versions, OS, Node, Docker and PostgreSQL; Core-only or composed.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result and actual result
+      description: Use synthetic accounts and sanitized logs. Include the request ID if available.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed credentials and personal/private deployment information.
+          required: true

@@ -1,0 +1,86 @@
+name: Prepare verified release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing reviewed Core tag (vX.Y.Z)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: release
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:f02121de6f74d30d8a94cd1d9584125e2178d7e6c377d8130112d4e52d867995
+        env:
+          POSTGRES_DB: openapp_test
+          POSTGRES_USER: openapp_test
+          POSTGRES_PASSWORD: ci-test-only
+        ports: ["5432:5432"]
+        options: --health-cmd 'pg_isready -U openapp_test' --health-interval 5s --health-timeout 5s --health-retries 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: "1.24.x"
+      - run: go install github.com/zricethezav/gitleaks/v8@v8.24.2
+      - run: npm run test:secrets
+      - name: Validate release identity
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const tag=process.env.RELEASE_TAG; if(!/^v\d+\.\d+\.\d+$/.test(tag)||tag!=="v"+JSON.parse(fs.readFileSync("package.json")).version) throw Error("tag must match package version");'
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "$RELEASE_TAG")"
+      - run: npm ci && npm ci --prefix backend && npm ci --prefix frontend
+      - run: npm run check:quality && npm test --prefix backend && npm test --prefix backend/runtime && npm run typecheck --prefix frontend && npm test --prefix frontend
+      - run: npm run test:sdk && npm run test:deployment && npm run test:release
+      - run: npm run test:postgres --prefix backend
+        env:
+          POSTGRES_TEST_URL: postgres://openapp_test:ci-test-only@127.0.0.1:5432/openapp_test
+      - run: docker build -t plain-web:1.0.0 examples/plain-web/runtime
+      - run: npm run test:acceptance -- --docker
+        env:
+          OPENAPP_RUNTIME_ACCEPTANCE_IMAGE: plain-web:1.0.0
+          OPENAPP_RUNTIME_ACCEPTANCE_PROFILE: ${{ github.workspace }}/examples/plain-web/runtime/profile.json
+      - run: npm audit --audit-level=high && npm audit --prefix backend --audit-level=high && npm audit --prefix frontend --audit-level=high
+      - run: npm run test:clean-install
+      - name: Export official artifacts
+        run: |
+          npm run release:openapp -- config/core.release.json "$RUNNER_TEMP/openapp-bundle" --official
+          npm run release:sdk -- "$RUNNER_TEMP/openapp-sdk"
+          bash "$RUNNER_TEMP/openapp-bundle/build-images.sh"
+          fingerprint=$(node -p 'require(process.env.RUNNER_TEMP+"/openapp-bundle/release-manifest.json").sourceFingerprint.slice(0,12)')
+          bash scripts/release/audit-images.sh "$RUNNER_TEMP/image-audit" "openapp-portal-backend:release-$fingerprint" "openapp-frontend:release-$fingerprint"
+          mkdir -p "$RUNNER_TEMP/deliverables"
+          tar -czf "$RUNNER_TEMP/deliverables/openapp-deployment.tar.gz" -C "$RUNNER_TEMP/openapp-bundle" .
+          cp "$RUNNER_TEMP/openapp-sdk/"*.tgz "$RUNNER_TEMP/deliverables/"
+          tar -czf "$RUNNER_TEMP/deliverables/image-audit.tar.gz" -C "$RUNNER_TEMP/image-audit" .
+          cd "$RUNNER_TEMP/deliverables"
+          sha256sum ./*.tar.gz ./*.tgz > SHA256SUMS
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+        with:
+          subject-path: ${{ runner.temp }}/deliverables/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verified-release
+          path: ${{ runner.temp }}/deliverables/
+      - name: Create reviewable draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: gh release create "$RELEASE_TAG" "$RUNNER_TEMP/deliverables/"* --draft --verify-tag --generate-notes

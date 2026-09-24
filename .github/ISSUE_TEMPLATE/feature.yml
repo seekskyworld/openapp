@@ -1,0 +1,14 @@
+name: Feature request
+description: Propose a generic platform capability.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and desired behavior
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Core or Adapter responsibility
+      description: Explain why this belongs in the generic platform and list compatibility implications.

@@ -1,0 +1,163 @@
+name: openapp
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-container_service}
+      POSTGRES_USER: ${POSTGRES_USER:-container_service}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks:
+      - control
+
+  docker-socket-proxy:
+    image: ${DOCKER_PROXY_IMAGE:-tecnativa/docker-socket-proxy:0.3.0}
+    environment:
+      AUTH: 0
+      BUILD: 1
+      COMMIT: 0
+      CONFIGS: 0
+      CONTAINERS: 1
+      DISTRIBUTION: 0
+      EVENTS: 0
+      EXEC: 1
+      GRPC: 1
+      IMAGES: 1
+      INFO: 1
+      NETWORKS: 1
+      NODES: 0
+      PING: 1
+      PLUGINS: 0
+      POST: 1
+      SECRETS: 0
+      SERVICES: 0
+      SESSION: 1
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0
+      VERSION: 1
+      VOLUMES: 1
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+    group_add:
+      - ${DOCKER_GID:?set DOCKER_GID to the host Docker socket GID}
+    expose:
+      - "2375"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:2375/_ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks:
+      - docker-control
+
+  portal:
+    image: ${PORTAL_IMAGE:-openapp-portal:local}
+    build:
+      context: ../../
+      dockerfile: backend/deployment/portal/Dockerfile
+      args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:24-bookworm-slim}
+        DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:-docker:29-cli}
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
+    container_name: ${OPENAPP_PORTAL_CONTAINER:-openapp-portal}
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 14310
+      # The Portal encodes these discrete credentials into a PostgreSQL URI.
+      # DATABASE_URL remains an optional override for an external database.
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-container_service}
+      POSTGRES_USER: ${POSTGRES_USER:-container_service}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PORTAL_PUBLIC_BASE_URL: ${PORTAL_PUBLIC_BASE_URL:?set PORTAL_PUBLIC_BASE_URL in .env}
+      PORTAL_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+      FRONTEND_BASE_URL: ${PORTAL_PUBLIC_BASE_URL:?set PORTAL_PUBLIC_BASE_URL in .env}
+      OPENAPP_APP_ID: ${OPENAPP_APP_ID:-openapp}
+      OPENAPP_APP_LABEL: ${OPENAPP_APP_LABEL:-OpenApp}
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-none}
+      OPENAPP_COMPATIBILITY_MODE: ${OPENAPP_COMPATIBILITY_MODE:-false}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      PORTAL_TRUST_PROXY: ${PORTAL_TRUST_PROXY:-false}
+      OPENAPP_ADMIN_CLI_TOKEN: ${OPENAPP_ADMIN_CLI_TOKEN:?set OPENAPP_ADMIN_CLI_TOKEN in .env}
+      OPENAPP_ADAPTER_ID: ${OPENAPP_ADAPTER_ID:?set OPENAPP_ADAPTER_ID in .env}
+      OPENAPP_ADAPTER_MODULE: ${OPENAPP_ADAPTER_MODULE:-}
+      OPENAPP_ADAPTER_REQUIRED: ${OPENAPP_ADAPTER_REQUIRED:-true}
+      OPENAPP_ADAPTER_ALLOWED_ROOTS: ${OPENAPP_ADAPTER_ALLOWED_ROOTS:-}
+      OPENAPP_ADAPTER_ALLOWED_PACKAGES: ${OPENAPP_ADAPTER_ALLOWED_PACKAGES:-}
+      OPENAPP_AUTH_PROVIDER_BASE_URL: ${OPENAPP_AUTH_PROVIDER_BASE_URL:-}
+      AUTH_PROVIDER_BASE_URL: ${AUTH_PROVIDER_BASE_URL:-}
+      OPENAPP_RUNTIME_IMAGE: ${OPENAPP_RUNTIME_IMAGE:-}
+      OPENAPP_RUNTIME_PROBE_IMAGE: ${OPENAPP_RUNTIME_PROBE_IMAGE:-node:24-bookworm-slim}
+      OPENAPP_NETWORK_NAME_PREFIX: ${OPENAPP_NETWORK_NAME_PREFIX:-openapp-instance-}
+      OPENAPP_NETWORK_POOL_CIDR: ${OPENAPP_NETWORK_POOL_CIDR:-10.240.0.0/12}
+      OPENAPP_NETWORK_SUBNET_PREFIX: ${OPENAPP_NETWORK_SUBNET_PREFIX:-28}
+      OPENAPP_CONTAINER_NAME_PREFIX: ${OPENAPP_CONTAINER_NAME_PREFIX:-openapp-user-}
+      OPENAPP_VOLUME_NAME_PREFIX: ${OPENAPP_VOLUME_NAME_PREFIX:-openapp-data-}
+      CONTAINER_RUNTIME: ${CONTAINER_RUNTIME:-docker}
+      CONTAINER_RUNTIME_ENDPOINT_MODE: network
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      OPENAPP_RUNTIME_ALLOWED_ORIGINS: ${OPENAPP_RUNTIME_ALLOWED_ORIGINS:-${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}}
+      OPENAPP_BRIDGE_ALLOWED_ORIGINS: ${OPENAPP_BRIDGE_ALLOWED_ORIGINS:-${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}}
+      OPENAPP_CONTAINER_MEMORY: ${OPENAPP_CONTAINER_MEMORY:-4g}
+      OPENAPP_CONTAINER_CPUS: ${OPENAPP_CONTAINER_CPUS:-2}
+      OPENAPP_CONTAINER_PIDS_LIMIT: ${OPENAPP_CONTAINER_PIDS_LIMIT:-512}
+      TARGET_PLATFORM: ${TARGET_PLATFORM:-linux/amd64}
+      NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:24-bookworm-slim}
+      DEBIAN_MIRROR: ${DEBIAN_MIRROR:-}
+      NPM_REGISTRY: ${NPM_REGISTRY:-}
+      PORTAL_STATIC_DIR: /app/public
+      OPENAPP_RELEASE_DIR: /var/lib/openapp/releases
+    volumes:
+      - type: bind
+        source: ${OPENAPP_RELEASE_DIR_HOST:?set OPENAPP_RELEASE_DIR_HOST in .env}
+        target: /var/lib/openapp/releases
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OPENAPP_ADAPTER_HOST_DIR:?set OPENAPP_ADAPTER_HOST_DIR in .env}
+        target: /app/adapters/${OPENAPP_ADAPTER_ID:?set OPENAPP_ADAPTER_ID in .env}
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:${PORTAL_PORT:-14310}:14310"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docker-socket-proxy:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - control
+      - docker-control
+      - egress
+
+volumes:
+  postgres-data:
+
+networks:
+  control:
+    internal: true
+  docker-control:
+    internal: true
+  # Control-plane egress is separate from the private PostgreSQL network.
+  # User instances are never attached here.
+  egress: {}

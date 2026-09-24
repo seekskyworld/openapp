@@ -1,0 +1,171 @@
+name: OpenApp CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openapp-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            backend/runtime/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - run: npm run test:coverage --prefix backend
+      - run: npm test --prefix backend/runtime
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: backend-coverage
+          path: .cache/backend.lcov
+          include-hidden-files: true
+
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build:contracts && npm ci --prefix frontend
+      - run: npm run typecheck --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend
+
+  deployment:
+    name: Deployment bundle checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            backend/runtime/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend
+      - run: npm run test:deployment
+      - run: npm run test:profiles
+      # 这些构建都会写入 dist，必须按顺序运行。
+      - run: npm run test:release
+      - run: npm run test:acceptance
+      - run: npm run release:openapp -- config/core.release.json "$RUNNER_TEMP/core-official" --official
+
+  postgres:
+    name: PostgreSQL migration and integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:f02121de6f74d30d8a94cd1d9584125e2178d7e6c377d8130112d4e52d867995
+        env:
+          POSTGRES_DB: container_service_test
+          POSTGRES_USER: container_service_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U container_service_test -d container_service_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            backend/runtime/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix backend
+      - run: npm run test:postgres --prefix backend
+        env:
+          POSTGRES_TEST_URL: postgres://container_service_test:ci-only-password@127.0.0.1:5432/container_service_test
+
+  docker:
+    name: Docker lifecycle and clean installation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+      - run: npm ci && npm ci --prefix backend && npm ci --prefix frontend
+      - run: docker build -t openapp-http-test:ci -f backend/runtime/src/testing/http-runtime.Dockerfile backend/runtime/src/testing
+      - run: docker pull node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+      - run: npm run test:acceptance -- --docker
+        env:
+          OPENAPP_RUNTIME_ACCEPTANCE_IMAGE: openapp-http-test:ci
+          OPENAPP_RUNTIME_ACCEPTANCE_PROFILE: ${{ github.workspace }}/backend/runtime/src/testing/http-runtime-profile.json
+      - run: npm run test:clean-install
+      - run: docker build -t plain-web:1.0.0 examples/plain-web/runtime
+      - run: npm run test:acceptance -- --docker
+        env:
+          OPENAPP_RUNTIME_ACCEPTANCE_IMAGE: plain-web:1.0.0
+          OPENAPP_RUNTIME_ACCEPTANCE_PROFILE: ${{ github.workspace }}/examples/plain-web/runtime/profile.json
+
+  tutorial:
+    name: New Adapter tutorial, composition and two real users
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+      - run: npm run test:tutorial
+
+  security:
+    name: Source secrets and dependency vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.x
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: "1.24.x"
+      - run: go install github.com/zricethezav/gitleaks/v8@v8.24.2
+      - run: npm run test:secrets
+      - run: npm ci && npm ci --prefix backend && npm ci --prefix frontend
+      - run: npm run check:quality
+      - run: npm run test:sdk
+      - run: npm audit --audit-level=high
+      - run: npm audit --prefix backend --audit-level=high
+      - run: npm audit --prefix backend/runtime --audit-level=high
+      - run: npm audit --prefix frontend --audit-level=high

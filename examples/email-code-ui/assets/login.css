@@ -1,0 +1,9 @@
+/* 仅影响本插件根节点，避免覆盖管理壳及其他 Adapter 的按钮和表单。 */
+.sample-auth { max-width: 28rem; padding: 1.5rem; color: #17202e; background: #fff; border: 1px solid #dbe1e8; border-radius: 1rem; }
+.sample-auth form, .sample-auth label { display: grid; gap: .75rem; }
+.sample-auth input, .sample-auth button { box-sizing: border-box; font: inherit; padding: .75rem; border: 1px solid #aeb8c6; border-radius: .5rem; }
+.sample-auth button { cursor: pointer; background: #edf2ff; color: #203966; }
+.sample-auth button img { width: 1.5rem; vertical-align: middle; margin-right: .5rem; }
+.sample-auth button:disabled { cursor: wait; opacity: .6; }
+.sample-auth [role="alert"] { color: #a01818; }
+.sample-auth :focus-visible { outline: 3px solid #5577bb; outline-offset: 2px; }

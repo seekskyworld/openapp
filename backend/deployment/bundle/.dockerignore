@@ -1,0 +1,13 @@
+**/node_modules/
+**/*.log
+**/dist/**/*.map
+deployment/postgres/data
+deployment/frontend/nginx/logs
+# Runtime data and source-only adapter code are never part of a Portal image.
+apps/*/apps
+apps/*/build-packages
+apps/*/.openapp-backups
+*/apps
+*/build-packages
+*/.openapp-backups
+adapters/*/src

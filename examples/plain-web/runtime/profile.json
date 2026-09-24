@@ -1,0 +1,19 @@
+{
+  "appId": "plain-web",
+  "id": "plain-web",
+  "contract": "plain-web-v1",
+  "runtimeContract": "plain-web-v1",
+  "environmentPrefix": "PLAIN_WEB",
+  "defaultImage": "plain-web:1.0.0",
+  "labelPrefix": "io.openapp.example",
+  "storageClass": "workspace-data",
+  "storageMountPath": "/data",
+  "containerPort": 8080,
+  "containerUser": "node",
+  "entrypoint": "/app/start.sh",
+  "command": ["node", "/app/server.mjs"],
+  "configEnvironmentKey": "PLAIN_WEB_CONFIG_JSON",
+  "reservedEnvironment": ["PLAIN_WEB_CONFIG_JSON"],
+  "healthPath": "/health",
+  "contextFiles": ["start.sh", "server.mjs"]
+}

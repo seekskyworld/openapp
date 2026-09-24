@@ -1,0 +1,14 @@
+{
+  "id": "http-test",
+  "contract": "http-test-v1",
+  "labelPrefix": "io.openapp.test",
+  "storageClass": "workspace-data",
+  "storageMountPath": "/data",
+  "containerPort": 8080,
+  "containerUser": "app",
+  "entrypoint": "/usr/local/bin/start-http",
+  "command": ["-f", "-p", "8080", "-h", "/srv"],
+  "configEnvironmentKey": "TEST_CONFIG_JSON",
+  "reservedEnvironment": [],
+  "healthPath": "/health"
+}

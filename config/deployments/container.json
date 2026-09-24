@@ -1,0 +1,7 @@
+{
+  "id": "container",
+  "runtimeEndpointMode": "network",
+  "portalContainer": "openapp-portal",
+  "portalPort": 14313,
+  "composeFile": "backend/deployment/docker-compose.yml"
+}

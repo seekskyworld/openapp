@@ -1,0 +1,7 @@
+{
+  "id": "stable",
+  "frontend": "static",
+  "buildBeforeStart": true,
+  "containerImage": "openapp-portal:stable",
+  "buildContainerImage": false
+}

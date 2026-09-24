@@ -1,0 +1,7 @@
+{
+  "id": "dev",
+  "frontend": "vite",
+  "buildBeforeStart": false,
+  "containerImage": "openapp-portal:dev",
+  "buildContainerImage": true
+}

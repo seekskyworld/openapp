@@ -1,0 +1,214 @@
+name: ${COMPOSE_PROJECT_NAME:-openapp-local}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine@sha256:f02121de6f74d30d8a94cd1d9584125e2178d7e6c377d8130112d4e52d867995}
+    container_name: openapp-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-container_service}
+      POSTGRES_USER: ${POSTGRES_USER:-container_service}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PORTAL_PUBLIC_BASE_URL: ${PORTAL_PUBLIC_BASE_URL:?set PORTAL_PUBLIC_BASE_URL in .env}
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [control]
+
+  docker-socket-proxy:
+    image: ${DOCKER_PROXY_IMAGE:-tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2}
+    container_name: openapp-docker-socket-proxy
+    environment:
+      AUTH: 0
+      BUILD: 1
+      COMMIT: 0
+      CONFIGS: 0
+      CONTAINERS: 1
+      DISTRIBUTION: 0
+      EVENTS: 0
+      EXEC: 1
+      GRPC: 1
+      IMAGES: 1
+      INFO: 1
+      NETWORKS: 1
+      NODES: 0
+      PING: 1
+      PLUGINS: 0
+      POST: 1
+      SECRETS: 0
+      SERVICES: 0
+      SESSION: 1
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0
+      VERSION: 1
+      VOLUMES: 1
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+    group_add:
+      - ${DOCKER_GID:?set DOCKER_GID to the host Docker socket GID}
+    expose:
+      - "2375"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:2375/_ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [docker-control]
+
+  portal-backend:
+    stop_grace_period: 20s
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:-docker:29-cli@sha256:018edbc908e08fcc9dbf029c812c34251e9b4719e6f71ca0e5eae2a987d014ca}
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6}
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
+        OPENAPP_DEPLOYMENT_SOURCE_SHA256: ${OPENAPP_DEPLOYMENT_SOURCE_SHA256:-unverified}
+        OPENAPP_ADAPTER_ID: ${OPENAPP_ADAPTER_ID:-openapp}
+    image: ${BACKEND_IMAGE:-openapp-portal-backend:local}
+    container_name: openapp-portal-backend
+    ports:
+      - "127.0.0.1:${PORTAL_BACKEND_PORT:-14313}:14313"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 14313
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-container_service}
+      POSTGRES_USER: ${POSTGRES_USER:-container_service}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PORTAL_PUBLIC_BASE_URL: ${PORTAL_PUBLIC_BASE_URL:?set PORTAL_PUBLIC_BASE_URL in .env}
+      MCP_APP_SANDBOX_ORIGIN: ${MCP_APP_SANDBOX_ORIGIN:?set MCP_APP_SANDBOX_ORIGIN in .env}
+      PORTAL_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+      FRONTEND_BASE_URL: ${PORTAL_PUBLIC_BASE_URL:?set PORTAL_PUBLIC_BASE_URL in .env}
+      OPENAPP_APP_ID: ${OPENAPP_APP_ID:-openapp}
+      OPENAPP_APP_LABEL: ${OPENAPP_APP_LABEL:-OpenApp}
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-none}
+      OPENAPP_COMPATIBILITY_MODE: ${OPENAPP_COMPATIBILITY_MODE:-false}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      PORTAL_TRUST_PROXY: ${PORTAL_TRUST_PROXY:-false}
+      OPENAPP_ADMIN_CLI_TOKEN: ${OPENAPP_ADMIN_CLI_TOKEN:?set OPENAPP_ADMIN_CLI_TOKEN in .env}
+      OPENAPP_ADAPTER_ID: ${OPENAPP_ADAPTER_ID:-}
+      OPENAPP_ADAPTER_MODULE: ${OPENAPP_ADAPTER_MODULE:-}
+      OPENAPP_ADAPTER_REQUIRED: ${OPENAPP_ADAPTER_REQUIRED:-true}
+      OPENAPP_ADAPTER_ALLOWED_ROOTS: ${OPENAPP_ADAPTER_ALLOWED_ROOTS:-}
+      OPENAPP_ADAPTER_ALLOWED_PACKAGES: ${OPENAPP_ADAPTER_ALLOWED_PACKAGES:-}
+      OPENAPP_AUTH_PROVIDER_BASE_URL: ${OPENAPP_AUTH_PROVIDER_BASE_URL:-}
+      AUTH_PROVIDER_BASE_URL: ${AUTH_PROVIDER_BASE_URL:-}
+      OPENAPP_RUNTIME_IMAGE: ${OPENAPP_RUNTIME_IMAGE:-}
+      OPENAPP_RUNTIME_PROBE_IMAGE: ${OPENAPP_RUNTIME_PROBE_IMAGE:-node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6}
+      OPENAPP_RUNTIME_ALLOWED_ORIGINS: ${OPENAPP_RUNTIME_ALLOWED_ORIGINS:-}
+      CONTAINER_RUNTIME: docker
+      CONTAINER_RUNTIME_ENDPOINT_MODE: network
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      OPENAPP_NETWORK_NAME_PREFIX: ${OPENAPP_NETWORK_NAME_PREFIX:-openapp-instance-}
+      OPENAPP_NETWORK_POOL_CIDR: ${OPENAPP_NETWORK_POOL_CIDR:-10.240.0.0/12}
+      OPENAPP_NETWORK_SUBNET_PREFIX: ${OPENAPP_NETWORK_SUBNET_PREFIX:-28}
+      OPENAPP_CONTAINER_NAME_PREFIX: ${OPENAPP_CONTAINER_NAME_PREFIX:-openapp-user-}
+      OPENAPP_VOLUME_NAME_PREFIX: ${OPENAPP_VOLUME_NAME_PREFIX:-openapp-data-}
+      OPENAPP_CONTAINER_MEMORY: ${OPENAPP_CONTAINER_MEMORY:-4g}
+      OPENAPP_CONTAINER_CPUS: ${OPENAPP_CONTAINER_CPUS:-2}
+      OPENAPP_CONTAINER_PIDS_LIMIT: ${OPENAPP_CONTAINER_PIDS_LIMIT:-512}
+      OPENAPP_PORTAL_CONTAINER: ${OPENAPP_PORTAL_CONTAINER:-openapp-portal-backend}
+      OPENAPP_BRIDGE_ALLOWED_ORIGINS: ${OPENAPP_BRIDGE_ALLOWED_ORIGINS:-}
+      TARGET_PLATFORM: ${TARGET_PLATFORM:-linux/amd64}
+      NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6}
+      DEBIAN_MIRROR: ${DEBIAN_MIRROR:-}
+      NPM_REGISTRY: ${NPM_REGISTRY:-}
+      PORTAL_STATIC_DIR: /app/public
+      OPENAPP_RELEASE_DIR: /app/releases
+      OPENAPP_RELEASE_PATH: ${OPENAPP_RELEASE_PATH:-openapp}
+    volumes:
+      - type: bind
+        source: ./${OPENAPP_RELEASE_PATH:-openapp}
+        target: /app/releases
+        read_only: false
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docker-socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:14313/api/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [control, docker-control, egress]
+
+  frontend:
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://127.0.0.1/api/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-nginx:stable-alpine@sha256:ef8676b33d681f272ba429b27658bdd7e640963279714c96bddf1dc76307f7b6}
+        OPENAPP_DEPLOYMENT_SOURCE_SHA256: ${OPENAPP_DEPLOYMENT_SOURCE_SHA256:-unverified}
+    image: ${FRONTEND_IMAGE:-openapp-frontend:local}
+    container_name: openapp-frontend
+    ports:
+      - "127.0.0.1:${PORTAL_PORT:-14310}:80"
+    volumes:
+      - ./frontend/nginx/logs:/var/log/nginx
+    depends_on:
+      portal-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [control, egress]
+
+  gateway:
+    image: ${CADDY_IMAGE:-caddy:2-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e}
+    container_name: openapp-gateway
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-agent.example.com}
+      MCP_APP_SANDBOX_HOSTNAME: ${MCP_APP_SANDBOX_HOSTNAME:?set MCP_APP_SANDBOX_HOSTNAME in .env}
+    depends_on:
+      frontend:
+        condition: service_started
+      portal-backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - gateway-data:/data
+      - gateway-config:/config
+    restart: unless-stopped
+    networks: [control, egress]
+
+networks:
+  control:
+    internal: true
+  docker-control:
+    internal: true
+  egress: {}
+
+volumes:
+  gateway-data:
+  gateway-config:

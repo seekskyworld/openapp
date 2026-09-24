@@ -1,0 +1,20 @@
+.pagination-bar {
+  align-items: center;
+  color: #7b8798;
+  display: flex;
+  font-size: 12px;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 12px 2px 0;
+}
+
+.pagination-bar label {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.pagination-bar select {
+  min-width: 64px;
+}

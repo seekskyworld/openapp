@@ -1,0 +1,9 @@
+{
+  "name": "@openapp/example-plain-web",
+  "license": "Apache-2.0",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": { "build": "node build.mjs" }
+}

@@ -1,0 +1,34 @@
+**/node_modules/
+**/dist/
+**/coverage/
+**/.cache/
+**/.turbo/
+**/*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+!.env.production.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+
+.golutra/
+.openapp/
+.codex/
+.agents/
+.DS_Store
+*.log
+*.swp
+*.swo
+.idea/
+.vscode/
+tmp/
+temp/
+/deployment-before-*/
+
+# 顶层 deployment 是本地生成/运行目录，不是 OpenApp 源码。
+# 受跟踪的部署模板与运行脚本位于 backend/deployment（bundle 是可导出的模板）；
+# 发布包、dist、数据库和镜像由导出器或目标主机生成，不能进入 Core 仓库。
+/deployment/

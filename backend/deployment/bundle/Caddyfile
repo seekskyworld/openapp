@@ -1,0 +1,11 @@
+{$PUBLIC_HOSTNAME:agent.example.com} {
+	reverse_proxy frontend:80
+}
+
+{$MCP_APP_SANDBOX_HOSTNAME:openapp-mcp.example.com} {
+	@instances path /instances/*
+	handle @instances {
+		reverse_proxy portal-backend:14313
+	}
+	respond 404
+}

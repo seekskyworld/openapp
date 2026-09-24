@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>我的独立笔记</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">OPENAPP · NOTES DEMO</p>
+      <h1>我的独立笔记</h1>
+      <p>写一段文字，保存后重新进入，笔记仍在自己的工作区中。</p>
+      <form id="editor">
+        <label for="note">笔记内容</label>
+        <textarea id="note" maxlength="4000" rows="8" placeholder="从这里开始记录……"></textarea>
+        <button type="submit">保存笔记</button>
+      </form>
+      <p id="status" role="status">正在读取…</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-25433}:5432"
+
+networks:
+  control:
+    internal: false

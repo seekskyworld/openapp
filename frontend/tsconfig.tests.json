@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "jsdom"]
+  },
+  "include": ["src", "tests"]
+}

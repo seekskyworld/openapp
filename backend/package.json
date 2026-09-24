@@ -1,0 +1,40 @@
+{
+  "name": "openapp-control-plane",
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm --prefix ../packages/contracts run build",
+    "dev": "tsx src/server.ts",
+    "build": "npm --prefix runtime run build && node scripts/clean-dist.mjs && tsc -p tsconfig.json",
+    "build:generic": "npm --prefix runtime run build:generic && node scripts/clean-dist.mjs && tsc -p tsconfig.generic.json && node scripts/assert-generic-dist.mjs --root dist --kind backend",
+    "test": "npm run build && node scripts/run-tests.mjs",
+    "test:postgres": "npm run build && node --test dist/postgres-package-migration.integration.test.js dist/postgres-resource-cleanup.integration.test.js dist/postgres-upgrade-rollout.integration.test.js dist/postgres-user-role.integration.test.js dist/postgres-workspace-execution.integration.test.js dist/postgres-tenant-membership.integration.test.js",
+    "start": "node dist/server-generic.js",
+    "migrate": "node dist/migrate-generic.js",
+    "migrate:generic": "node dist/migrate-generic.js",
+    "migrate:legacy": "node dist/migrate-legacy.js",
+    "openappctl": "node dist/cli.js",
+    "test:coverage": "npm run build && node scripts/run-tests.mjs --coverage"
+  },
+  "bin": {
+    "openappctl": "dist/cli.js"
+  },
+  "dependencies": {
+    "@openapp/contracts": "file:../packages/contracts",
+    "@openapp/container-runtime": "file:./runtime",
+    "busboy": "^1.6.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

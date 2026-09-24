@@ -1,0 +1,13 @@
+{
+  "id": "local",
+  "runtimeEndpointMode": "loopback",
+  "backendHost": "127.0.0.1",
+  "backendPort": 14313,
+  "frontendHost": "127.0.0.1",
+  "frontendPort": 4174,
+  "databaseService": "postgres",
+  "databaseComposeFiles": [
+    "backend/deployment/docker-compose.yml",
+    "backend/deployment/docker-compose.local.yml"
+  ]
+}

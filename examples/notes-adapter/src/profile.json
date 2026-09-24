@@ -1,0 +1,16 @@
+{
+  "id": "notes-demo",
+  "contract": "notes-demo-v1",
+  "environmentPrefix": "NOTES_DEMO",
+  "defaultImage": "openapp-notes-demo:1.0.0",
+  "labelPrefix": "io.openapp.notes-demo",
+  "storageClass": "workspace-data",
+  "storageMountPath": "/data",
+  "containerPort": 8080,
+  "containerUser": "node",
+  "entrypoint": "/app/start.sh",
+  "command": ["node", "/app/backend/server.mjs"],
+  "configEnvironmentKey": "NOTES_CONFIG_JSON",
+  "reservedEnvironment": ["NOTES_CONFIG_JSON"],
+  "healthPath": "/health"
+}

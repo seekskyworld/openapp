@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "defaultAppId": "plain-web",
+  "compatibilityMode": false,
+  "plugins": [{ "id": "plain-web", "source": ".", "version": "1.0.0" }]
+}

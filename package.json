@@ -1,0 +1,36 @@
+{
+  "name": "openapp",
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:tutorial": "node scripts/tutorial/run.mjs",
+    "test:postgres:isolated": "node scripts/test-postgres-isolated.mjs",
+    "release:sdk": "node scripts/release/contracts-package.mjs",
+    "test:sdk": "node --test scripts/release/contracts-install.test.mjs",
+    "release:openapp": "node scripts/export-openapp.mjs",
+    "test:clean-install": "OPENAPP_CLEAN_INSTALL_TEST=1 node --test scripts/release/clean-install.test.mjs",
+    "test:secrets": "node scripts/check-secrets.mjs",
+    "test:release": "node --test scripts/export-openapp.test.mjs scripts/prune-generic-artifacts.test.mjs scripts/release-operations.test.mjs scripts/release/source-provenance.test.mjs",
+    "build:contracts": "npm --prefix packages/contracts run build",
+    "openapp:config": "node scripts/openapp.mjs config",
+    "openapp:start": "node scripts/openapp.mjs start",
+    "openapp:stop": "node scripts/openapp.mjs stop",
+    "test:acceptance": "node scripts/openapp-acceptance.mjs",
+    "test:acceptance:full": "node scripts/openapp-acceptance.mjs --regression --postgres --docker",
+    "pretest:deployment": "npm run build:contracts",
+    "test:deployment": "node --test scripts/check-deployment-drift.test.mjs scripts/composition-lock.test.mjs scripts/sql-seed.test.mjs scripts/public-assets.test.mjs scripts/validate-adapter-legacy-release.test.mjs scripts/validate-adapter-runtime.test.mjs scripts/validate-adapter-manifest.test.mjs",
+    "test:profiles": "node --check scripts/openapp.mjs && node --test scripts/openapp-profile.test.mjs",
+    "check:quality": "node scripts/check-quality.mjs"
+  },
+  "devDependencies": {
+    "eslint": "10.11.0",
+    "prettier": "3.9.8",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "8.70.0"
+  }
+}
