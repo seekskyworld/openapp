@@ -13,7 +13,8 @@
     English · <a href="README.zh-CN.md">简体中文</a> ·
     <a href="docs/README.en.md">Docs</a> ·
     <a href="docs/getting-started.en.md">Getting started</a> ·
-    <a href="CONTRIBUTING.md">Contributing</a>
+    <a href="CONTRIBUTING.md">Contributing</a> ·
+    <a href="docs/support-matrix.en.md">Support matrix</a>
   </p>
 </div>
 

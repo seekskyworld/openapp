@@ -1,0 +1,5 @@
+# 公共合同、认证、持久化和发布流程需要维护者复核。
+* @seekskyworld
+/.github/ @seekskyworld
+/backend/src/persistence/ @seekskyworld
+/packages/contracts/ @seekskyworld

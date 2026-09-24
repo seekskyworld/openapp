@@ -17,6 +17,12 @@ repository owns the actual business services and pages.
 4. [Compose a release](composition-release.en.md), then follow
    [server installation and updates](plugin-catalog-release.en.md).
 
+Check the [support matrix](support-matrix.en.md) before choosing runtime and
+database versions.
+
+All links in the tracked documentation are checked in CI. If a guide moves, update
+both language indexes and the links from the affected guide in the same change.
+
 ## Implementation references
 
 | Task                                                         | Guide                                               |
@@ -41,7 +47,7 @@ browser views, not an identity service. Use the English tutorial for commands.
 
 ## Maintenance and limits
 
-See [contributing](../CONTRIBUTING.md), [security](../SECURITY.md),
+See [contributing](../CONTRIBUTING.md), [code of conduct](../CODE_OF_CONDUCT.md), [security](../SECURITY.md),
 [governance](../GOVERNANCE.md) and [changelog](../CHANGELOG.md).
 The existing detailed [backup/restore runbook](operations/backup-restore-runbook.md)
 and [local development reference](local-development.md) are in Chinese; the English

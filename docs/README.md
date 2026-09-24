@@ -10,6 +10,7 @@ OpenApp 为已有应用提供统一控制面，通过独立 Adapter 接入应用
 - **想让现有单用户应用供多人独立使用**：先读[适用范围与接入边界](application-integration.md)，再按[双用户实战教程](adapter-tutorial.md)完成接入、组合、启动与验收。
 - **只想体验管理控制面**：按[首次安装](first-install.md)部署纯 Core。没有 Adapter 时不提供业务应用的运行能力。
 - **准备修改 OpenApp 源码**：按[本地开发与测试](local-development.md)安装依赖、选择运行方式并执行检查。
+- **确认版本和运行环境是否受支持**：查看[支持矩阵](support-matrix.en.md)，并记录组合包的 Core、contracts 与 Adapter 版本。
 - **已有部署需要升级**：先看[组合包部署](plugin-catalog-release.md)和[备份恢复手册](operations/backup-restore-runbook.md)，保留原数据库、数据目录和服务身份。
 
 ## 开发 Adapter
@@ -41,3 +42,4 @@ OpenApp 为已有应用提供统一控制面，通过独立 Adapter 接入应用
 - [本地开发](local-development.md)与[贡献指南](../CONTRIBUTING.md)：依赖、运行配置、测试与代码规范。
 - [组合编译](composition-release.md)与[项目治理](../GOVERNANCE.md)：SDK、发布来源与质量检查。
 - [变更记录](../CHANGELOG.md)、[安全政策](../SECURITY.md)、[支持渠道](../SUPPORT.md)和[第三方说明](../THIRD_PARTY_NOTICES.md)。
+- [行为准则](../CODE_OF_CONDUCT.md)适用于公开讨论和贡献。

@@ -2,13 +2,13 @@
 
 Use Node.js 24 LTS (`.node-version`), npm and Docker Engine/OrbStack. Install dependencies with `npm ci` at the root, then in `backend/runtime`, `backend` and `frontend`. The contracts compiler is provided by the root lockfile.
 
-See [local development and tests](docs/local-development.md) for runtime profiles and commands, or the [English documentation index](docs/README.en.md) for application integration and deployment guides.
+See [local development and tests](docs/local-development.md) for runtime profiles and commands, the [support matrix](docs/support-matrix.en.md) for tested versions, or the [English documentation index](docs/README.en.md) for application integration and deployment guides.
 
 Keep Core application-neutral. Add application identity, authentication policy, branding, build slots and legacy data projections to an independently versioned Adapter. Depend on `@openapp/contracts`; never import another repository's private source or copy its implementation into Core. See [Adapter development](docs/adapter-development.en.md).
 
 Use small changes with an explanation of behavior, compatibility and relevant tests. Do not include `.env`, database contents, local paths, personal accounts or generated deployment folders. Test fixtures must use synthetic data. Follow the Apache-2.0 license; contributions are submitted under the same license.
 
-Before submitting, run backend and frontend tests, frontend type checks, `npm run test:deployment`, `npm run test:profiles`, `npm run test:release` and `npm run test:secrets` (Gitleaks required). Run exporters and builds serially because they share `dist`. Changes to migrations, persistence or runtime behavior also require disposable PostgreSQL and Docker acceptance; do not point tests at a production database. CI runs these gates without opt-in variables.
+Before submitting, run backend and frontend tests, frontend type checks, `npm run test:deployment`, `npm run test:profiles`, `npm run test:release`, `npm run check:docs` and `npm run test:secrets` (Gitleaks required). Run exporters and builds serially because they share `dist`. Changes to migrations, persistence or runtime behavior also require disposable PostgreSQL and Docker acceptance; do not point tests at a production database. CI runs these gates without opt-in variables.
 
 Release changes require the clean-install test and regression against the matching Adapter versions. Document public contract changes, bump the appropriate package version and record them in [CHANGELOG.md](CHANGELOG.md). Do not claim a release is production-ready from unit tests alone; record the specific migration chain and restore/lifecycle evidence.
 
