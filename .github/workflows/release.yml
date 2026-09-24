@@ -72,7 +72,7 @@ jobs:
           tar -czf "$RUNNER_TEMP/deliverables/image-audit.tar.gz" -C "$RUNNER_TEMP/image-audit" .
           cd "$RUNNER_TEMP/deliverables"
           sha256sum ./*.tar.gz ./*.tgz > SHA256SUMS
-      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-path: ${{ runner.temp }}/deliverables/*
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
