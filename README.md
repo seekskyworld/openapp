@@ -1,8 +1,8 @@
 <div align="center">
   <img src="frontend/public/openapp-logo.png" alt="OpenApp Logo" width="112" />
   <h1>OpenApp</h1>
-  <p><strong>Your single-user app. An independent workspace for everyone.</strong></p>
-  <p>Keep your business logic · Separate user environments · One place to deploy and operate</p>
+  <p><strong>One app. An independent environment for every user.</strong></p>
+  <p>Keep your single-user business logic. Deliver it to teams and customers.</p>
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="License: Apache-2.0" /></a>
     <a href="docs/first-install.en.md"><img src="https://img.shields.io/badge/Deployment-Self--Hosted-16a34a" alt="Self-hosted deployment" /></a>
@@ -24,37 +24,43 @@
 
 ---
 
-## You built the app. You shouldn't have to build an entire platform.
+## Keep building your app, without maintaining a second SaaS architecture
 
-A useful Web tool, AI workspace or self-hosted service may work beautifully for one person. Sharing it with more people often means building accounts, permissions, user environments, persistent storage, deployment tooling and upgrade management.
+Many Web apps, AI agents and developer tools are designed around one person's workspace, configuration and data. A desktop client and a Web version may even share the same business code.
 
-**OpenApp supplies those shared platform capabilities so you can stay focused on the application.**
+Offering that application to a team or to customers can turn into another project: redesign the backend for multiple tenants, add accounts and permissions, separate user data, and build deployment and instance management. Developers can end up maintaining both a single-user product and a SaaS architecture—or staffing a separate platform team.
 
-Connect an existing app through an independent Adapter and give users their own environments behind one entry point. Reduce the need for a separate platform team or a new project to rewrite the application as a multi-tenant system.
+**OpenApp adds multi-user access around your application, with an independent runtime environment and persistent workspace for each user.** For suitable applications, you can keep the single-user business logic and put the integration in an Adapter.
 
-Users share the application image, while their workspaces and persistent data remain separate. Your app handles its business; OpenApp handles access and environment management.
+## What your users get
 
-## Why OpenApp
+Imagine you build an AI coding workspace with a Web interface. Alice and Bob sign in through OpenApp and launch the same application image. Each gets a separate instance with their own agent state, terminal, files and configuration. OpenApp checks workspace ownership before routing requests; application restarts retain each workspace's persistent data.
 
-- **Reuse platform capabilities.** Centralize accounts, authorization, instance lifecycle, access proxying, resource limits and monitoring instead of rebuilding an administration system for every project.
-- **Give each user their own space.** Provide independent environments and persistent storage, with server-side ownership checks controlling access.
-- **Keep your stack and application structure.** An Adapter describes build inputs, startup and integration. Projects do not have to fit a fixed frontend/backend package layout.
-- **Bring multiple projects together.** Maintain Core, Adapters and applications independently; compose selected integrations through public contracts.
-- **Prepare once, deploy from a directory.** Compile Core and Adapters into a bundle with Dockerfiles, configuration and integrity checks. Servers do not need to assemble source repositories.
-- **Control upgrades and operating costs.** Update the platform separately from application images, check candidates before activation, and manage instances through the UI and CLI with resource limits and idle stopping.
-- **Own your deployment.** Self-host and extend under Apache-2.0. Docker and OrbStack are implemented today; common Provider interfaces provide a foundation for other execution platforms.
+Your application continues to work with one user's environment. OpenApp manages the accounts, environment allocation, access, deployment and upgrades across those independent instances.
 
-## Built for existing projects
+## What you avoid rebuilding
 
-Personal Web tools, AI workspaces, internal applications and open-source self-hosted services can offer independent environments to more users while reusing their existing business logic.
+- **A separate multi-tenant business backend.** Keep improving the same application for personal and hosted use, reducing duplicated development and platform staffing costs.
+- **An operations console for every project.** Reuse account management, access control, instance start/stop, task records and diagnostics through the management UI and CLI.
+- **A deployment process tied to your source layout.** An Adapter declares the app's build inputs and startup requirements. It does not have to use a fixed frontend/backend package pair.
+- **Manual assembly on every server.** Compose Core and selected Adapters into a compiled deployment directory with Dockerfiles, configuration and integrity checks; build the Linux images on the server.
+- **A platform release for every app update.** Update application images separately, test candidates before activation, and use resource limits and idle stopping to manage capacity.
 
-Applications must be suitable for containerized execution. Integration still needs application-specific configuration, authentication handoff where applicable, and appropriate boundaries for external data services. See [integration requirements](docs/getting-started.en.md#integration-requirements).
+Core, Adapters and business applications remain independently maintained. OpenApp is self-hosted and licensed under Apache-2.0.
 
-## What's next
+## Separate the application from the execution platform
 
-We plan to extend the execution layer with Kubernetes (K8s) support and more runtimes and infrastructure Providers, so the same application integration can reach more deployment environments. Docker and OrbStack are supported today; these additional backends are planned, not currently available. Contributions to public contracts, Provider implementations and real deployment tests are welcome.
+The Adapter describes how an application integrates with OpenApp. Runtime/Provider interfaces describe how to create, start, stop and access its environment. This separation lets execution platforms evolve without putting infrastructure-specific management into your business code.
 
-## Bring your application
+**Docker is implemented today, including local development with OrbStack.** Kubernetes (K8s), Daytona and additional runtimes are expansion directions; they are not bundled, supported Providers yet. Each new Provider will need implementation and lifecycle testing against the public contracts.
+
+## Connect your application
+
+1. **Package the app:** provide a containerized Web app or HTTP service and identify the files that must persist.
+2. **Write an Adapter:** describe its image or build inputs, startup, health checks, storage and any authentication handoff.
+3. **Compose and deploy:** combine the Adapter with Core, deploy the directory, and verify two users can work independently.
+
+This fits personal Web tools, AI workspaces, internal services and desktop projects that also expose a deployable Web/service version. The current workspace contract runs one application container with one HTTP entry. A desktop GUI alone is not sufficient; shared external databases, object storage and credentials still need application-specific isolation. See [integration requirements](docs/getting-started.en.md#integration-requirements).
 
 [**Follow the tutorial: from a single-user app to two independent user workspaces →**](docs/adapter-tutorial.en.md)
 
