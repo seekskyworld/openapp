@@ -63,9 +63,19 @@ Adapter 描述应用如何接入 OpenApp；Runtime/Provider 接口负责环境�
 
 [**跟着教程，接入一个应用并验证双用户独立使用 →**](docs/adapter-tutorial.md)
 
-[文档中心](docs/README.md) · [Adapter 开发](docs/adapter-development.md) · [组合编译](docs/composition-release.md) · [首次安装](docs/first-install.md)
+## Links
 
-欢迎通过[贡献指南](CONTRIBUTING.md)参与开发，或通过[支持渠道](SUPPORT.md)反馈使用体验。安全问题请遵循[安全政策](SECURITY.md)。
+- [项目仓库](https://github.com/seekskyworld/openapp)
+- [版本发布](https://github.com/seekskyworld/openapp/releases)
+- [问题反馈](https://github.com/seekskyworld/openapp/issues)
+- [LINUX DO — 社区交流](https://linux.do/)
+- [文档中心](docs/README.md)
+- [首次安装](docs/first-install.md)
+- [Adapter 开发](docs/adapter-development.md)
+- [组合编译与部署](docs/composition-release.md)
+- [贡献指南](CONTRIBUTING.md)
+- [支持渠道](SUPPORT.md)
+- [安全政策](SECURITY.md)
 
 ## 许可证
 

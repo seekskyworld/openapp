@@ -64,9 +64,19 @@ This fits personal Web tools, AI workspaces, internal services and desktop proje
 
 [**Follow the tutorial: from a single-user app to two independent user workspaces →**](docs/adapter-tutorial.en.md)
 
-[Getting started](docs/getting-started.en.md) · [Documentation](docs/README.en.md) · [Adapter development](docs/adapter-development.en.md) · [Composition](docs/composition-release.en.md)
+## Links
 
-Contributions are welcome: see [contributing](CONTRIBUTING.md), [support](SUPPORT.md) and the [security policy](SECURITY.md).
+- [Repository](https://github.com/seekskyworld/openapp)
+- [Releases](https://github.com/seekskyworld/openapp/releases)
+- [Issues](https://github.com/seekskyworld/openapp/issues)
+- [LINUX DO — community discussion](https://linux.do/)
+- [Documentation](docs/README.en.md)
+- [Getting started](docs/getting-started.en.md)
+- [Adapter development](docs/adapter-development.en.md)
+- [Composition and deployment](docs/composition-release.en.md)
+- [Contributing](CONTRIBUTING.md)
+- [Support](SUPPORT.md)
+- [Security policy](SECURITY.md)
 
 ## License
 
