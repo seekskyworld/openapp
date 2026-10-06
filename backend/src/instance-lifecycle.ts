@@ -60,6 +60,8 @@ export interface LifecycleStore {
   markUserAppInitialized(id: string): Promise<void>;
   withCapacityLock?<T>(operation: () => Promise<T>): Promise<T>;
   getLaunchTarget(appId: string): Promise<AppLaunchTarget>;
+  /** Production stores validate observed labels before projecting or persisting them. */
+  isCatalogSnapshotValid?(snapshot: ContainerCatalogSnapshot): Promise<boolean>;
 }
 
 export interface LifecycleAudit {
@@ -312,7 +314,7 @@ export class InstanceLifecycle {
               // deferred Docker candidate may already be the canonical container,
               // but its snapshot is not durable until this rebuild is committed.
               // Do not persist that candidate before the requested target is known.
-              current = options.target ? settled : await this.#syncRecord(settled, signal);
+              current = options.target || options.useLatestVersion ? settled : await this.#syncRecord(settled, signal);
             } catch (error) {
               // A missing canonical during a crashed rebuild is reconciled by the
               // Runtime transaction itself. Preserve the durable intent until that
@@ -352,6 +354,7 @@ export class InstanceLifecycle {
               imageArtifactId,
               imageReference,
             };
+            await this.#assertCatalogSnapshot(expectedCatalogSnapshot);
             const launchProfile =
               options.target?.launchProfile ??
               toLaunchProfile(await this.#store.getProvisioningPolicy(), imageReference);
@@ -418,9 +421,11 @@ export class InstanceLifecycle {
                     ? error.recoveredInstance
                     : await this.#runtime.get(current.id, signal);
                 if (recovered && recovered.ownerId === current.userId) {
+                  const sourceSnapshot = catalogSnapshot(current);
                   if (
                     recovered.catalogSnapshot &&
-                    !catalogSnapshotsEqual(recovered.catalogSnapshot, expectedCatalogSnapshot)
+                    !catalogSnapshotsEqual(recovered.catalogSnapshot, expectedCatalogSnapshot) &&
+                    (!sourceSnapshot || !catalogSnapshotsEqual(recovered.catalogSnapshot, sourceSnapshot))
                   ) {
                     await this.#store.updateContainer({
                       ...current,
@@ -435,7 +440,7 @@ export class InstanceLifecycle {
                       recovered,
                       current.stopReason,
                       undefined,
-                      expectedCatalogSnapshot,
+                      recovered.catalogSnapshot ?? expectedCatalogSnapshot,
                     );
                   }
                 } else {
@@ -825,7 +830,7 @@ export class InstanceLifecycle {
     expectedCatalogSnapshot?: ContainerCatalogSnapshot,
   ): Promise<Container> {
     const latest = await this.#store.getContainer(record.id);
-    const updated = this.#projectRuntimeInstance(
+    const updated = await this.#projectRuntimeInstance(
       record,
       instance,
       stopReason,
@@ -838,14 +843,14 @@ export class InstanceLifecycle {
     return updated;
   }
 
-  #projectRuntimeInstance(
+  async #projectRuntimeInstance(
     record: Container,
     instance: ContainerInstance,
     stopReason = record.stopReason,
     expectedState?: "running" | "stopped",
     latestActivityAt?: string,
     expectedCatalogSnapshot?: ContainerCatalogSnapshot,
-  ): Container {
+  ): Promise<Container> {
     if (instance.ownerId !== record.userId) {
       throw new InstanceLifecycleError("container_owner_mismatch");
     }
@@ -860,6 +865,7 @@ export class InstanceLifecycle {
     if (snapshot && expectedCatalogSnapshot && !catalogSnapshotsEqual(snapshot, expectedCatalogSnapshot)) {
       throw new InstanceLifecycleError("container_catalog_mismatch");
     }
+    await this.#assertCatalogSnapshot(snapshot ?? catalogSnapshot(record));
     const snapshotRecord = snapshot
       ? {
           ...record,
@@ -876,7 +882,7 @@ export class InstanceLifecycle {
           instance.state === "stopped" &&
           stopReason === null;
     const preserveFailure =
-      record.status === "failed" && !instance.rebuildRecovered && instance.state === "stopped";
+      expectedState === undefined && record.status === "failed" && !instance.rebuildRecovered && instance.state === "stopped";
     const updated: Container = {
       ...snapshotRecord,
       runtimeId: instance.runtimeId,
@@ -894,6 +900,12 @@ export class InstanceLifecycle {
         : record.lastActivityAt,
     };
     return updated;
+  }
+
+  async #assertCatalogSnapshot(snapshot: ContainerCatalogSnapshot | undefined): Promise<void> {
+    if (snapshot && this.#store.isCatalogSnapshotValid && !await this.#store.isCatalogSnapshotValid(snapshot)) {
+      throw new InstanceLifecycleError("container_catalog_mismatch");
+    }
   }
 
   async #observeActivity(

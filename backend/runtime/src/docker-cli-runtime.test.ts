@@ -49,7 +49,7 @@ function inspect(
   instanceId: string,
   ownerId: string,
   status = "running",
-  options: { id?: string; hostname?: string; labels?: Record<string, string> } = {},
+  options: { id?: string; hostname?: string; labels?: Record<string, string>; startedAt?: string } = {},
 ): string {
   return JSON.stringify([
     {
@@ -64,7 +64,7 @@ function inspect(
           ...options.labels,
         },
       },
-      State: { Status: status },
+      State: { Status: status, ...(options.startedAt ? { StartedAt: options.startedAt } : {}) },
       NetworkSettings: {
         Ports: {
           "37371/tcp": [{ HostIp: "127.0.0.1", HostPort: "49152" }],
@@ -2535,9 +2535,10 @@ test("get converges a deferred start after the first lock helper attempt fails",
 
 test("rollback tombstones recover every durable handoff state before deletion", async (t) => {
   const cases = [
-    { name: "before predecessor rename", predecessorName: "previous", predecessorState: "stopped" },
-    { name: "after predecessor rename", predecessorName: "canonical", predecessorState: "stopped" },
-    { name: "after predecessor start", predecessorName: "canonical", predecessorState: "running" },
+    { name: "before predecessor rename", predecessorName: "previous", predecessorState: "stopped", neverStarted: false },
+    { name: "after predecessor rename", predecessorName: "canonical", predecessorState: "stopped", neverStarted: false },
+    { name: "after predecessor start", predecessorName: "canonical", predecessorState: "running", neverStarted: false },
+    { name: "unstarted candidate cannot own predecessor locks", predecessorName: "canonical", predecessorState: "stopped", neverStarted: true },
   ] as const;
   for (const [index, crash] of cases.entries()) {
     await t.test(crash.name, async () => {
@@ -2560,7 +2561,7 @@ test("rollback tombstones recover every durable handoff state before deletion", 
         [predecessorName, { id: previousId, state: crash.predecessorState, labels: {} }],
         [rollbackName, {
           id: candidateId,
-          state: "stopped",
+          state: crash.neverStarted ? "created" : "stopped",
           labels: {
             "io.sample-app.portal.rebuild-id": `tombstone-transaction-${index}`,
             "io.sample-app.portal.rebuild-predecessor-id": previousId,
@@ -2576,11 +2577,15 @@ test("rollback tombstones recover every durable handoff state before deletion", 
       ]);
       const run: CommandRunner = async (_binary, args) => {
         calls.push([...args]);
+        if (crash.neverStarted && args[0] === "run") throw new Error("state_lock_recovery_holder_not_authorized");
         if (isContainerInspect(args)) {
           const current = containers.get(String(args[2]));
           if (!current) throw new Error("No such container");
           return {
-            stdout: inspect(instanceId, ownerId, current.state, { id: current.id, labels: current.labels }),
+            stdout: inspect(instanceId, ownerId, current.state, {
+              id: current.id, labels: current.labels,
+              ...(crash.neverStarted && current.id === candidateId ? { startedAt: "0001-01-01T00:00:00Z" } : {}),
+            }),
             stderr: "",
           };
         }
@@ -2611,7 +2616,8 @@ test("rollback tombstones recover every durable handoff state before deletion", 
       const recoveryIndex = calls.findIndex((args) => args[0] === "run");
       const startIndex = calls.findIndex((args) => args.join(" ") === `start ${canonicalName}`);
       const removalIndex = calls.findIndex((args) => args.join(" ") === `rm --force ${rollbackName}`);
-      assert.ok(recoveryIndex >= 0);
+      if (crash.neverStarted) assert.equal(recoveryIndex, -1);
+      else assert.ok(recoveryIndex >= 0);
       if (crash.predecessorState === "stopped") assert.ok(startIndex > recoveryIndex);
       assert.ok(removalIndex > recoveryIndex);
       if (startIndex >= 0) assert.ok(removalIndex > startIndex);

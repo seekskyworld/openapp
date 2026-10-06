@@ -12,6 +12,7 @@ import { createGenericPortalStores } from "./stores-core.js";
 import type { PortalStores } from "./stores-contracts.js";
 import { createContainerRuntime, type ContainerRuntime } from "./runtime.js";
 import { InstanceLifecycle, type LifecycleAudit } from "./instance-lifecycle.js";
+import { isRuntimeCatalogSnapshotValid } from "./runtime-catalog.js";
 import { ForwardingPolicyManager } from "./forwarding-policy.js";
 import {
   AppAuthHandoffCoordinator,
@@ -654,6 +655,7 @@ export function createPortalContext(options: PortalContextOptions = {}): PortalC
         ? (container) => stores.instances.updateContainer(container)
         : (container) => executionManager.persistLegacyContainer(container),
       getLaunchTarget: (appId) => catalog.launchTarget(appId),
+      isCatalogSnapshotValid: (snapshot) => isRuntimeCatalogSnapshotValid(snapshot, stores.catalog, stores.builds),
     },
     audit: options.audit ?? stores.admin.recordAudit,
     withContainerMaintenance: (instanceId, operation) => stores.admin.withMaintenanceLease(

@@ -229,6 +229,7 @@ export interface DockerInspect {
   };
   State: {
     Status: string;
+    StartedAt?: string;
     ExitCode?: number;
     OOMKilled?: boolean;
     Health?: { Status?: string };
@@ -274,6 +275,8 @@ export interface RebuildContainerMetadata {
   sourceCatalogSnapshot?: ContainerCatalogSnapshot;
 }
 export interface InspectedContainer extends ContainerInstance {
+  /** Positive Docker evidence that this generation never ran and cannot own a state lock. */
+  neverStarted?: boolean;
   rebuild?: RebuildContainerMetadata;
   /** Docker inspect 的 hostname；共享 Volume 锁可能记录它而非完整容器 ID。 */
   containerHostname?: string;

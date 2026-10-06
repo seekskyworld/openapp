@@ -13,7 +13,7 @@
     "build": "npm --prefix runtime run build && node scripts/clean-dist.mjs && tsc -p tsconfig.json",
     "build:generic": "npm --prefix runtime run build:generic && node scripts/clean-dist.mjs && tsc -p tsconfig.generic.json && node scripts/assert-generic-dist.mjs --root dist --kind backend",
     "test": "npm run build && node scripts/run-tests.mjs",
-    "test:postgres": "npm run build && node --test dist/postgres-package-migration.integration.test.js dist/postgres-resource-cleanup.integration.test.js dist/postgres-upgrade-rollout.integration.test.js dist/postgres-user-role.integration.test.js dist/postgres-workspace-execution.integration.test.js dist/postgres-tenant-membership.integration.test.js",
+    "test:postgres": "npm run build && node --test dist/postgres-package-migration.integration.test.js dist/postgres-resource-cleanup.integration.test.js dist/postgres-upgrade-rollout.integration.test.js dist/postgres-user-role.integration.test.js dist/postgres-workspace-execution.integration.test.js dist/postgres-tenant-membership.integration.test.js dist/instance-lifecycle.postgres.integration.test.js",
     "start": "node dist/server-generic.js",
     "migrate": "node dist/migrate-generic.js",
     "migrate:generic": "node dist/migrate-generic.js",

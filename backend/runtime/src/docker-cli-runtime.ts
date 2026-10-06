@@ -1939,6 +1939,10 @@ export class DockerCliRuntime implements ContainerRuntime {
     }
     await this.#docker(["stop", "--time", "30", name], signal);
     if (name !== rollbackName) await this.#docker(["rename", name, rollbackName], signal);
+    // A candidate that never ran cannot have acquired an application lock.
+    // Running its recovery helper would reject a legitimate predecessor lock
+    // and strand the rollback. Missing StartedAt evidence still fails closed.
+    if (candidate.neverStarted) return;
     await this.#recoverStateLocks(
       instanceId,
       ownerId,
@@ -2591,6 +2595,9 @@ export class DockerCliRuntime implements ContainerRuntime {
       ...catalogSnapshotMetadata(labels, "", this.#labelPrefixes()),
       ...rebuildMetadata(labels, this.#labelPrefixes()),
     };
+    if (inspect.State.Status === "created" && inspect.State.StartedAt === "0001-01-01T00:00:00Z") {
+      instance.neverStarted = true;
+    }
     const containerHostname = readDockerContainerHostname(inspect.Config.Hostname);
     if (containerHostname) instance.containerHostname = containerHostname;
     const scheme = resourceLabel(labels, "resource-scheme", this.#labelPrefixes());
