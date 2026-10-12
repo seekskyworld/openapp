@@ -26,7 +26,11 @@ import type {
   ContainerInstance,
   ContainerRuntime,
 } from "./runtime.js";
-import { ContainerRebuildRollbackError, ManagedResourceResolutionError } from "./runtime.js";
+import {
+  ContainerRebuildRollbackError,
+  findContainerRuntimeSafetyError,
+  ManagedResourceResolutionError,
+} from "./runtime.js";
 import { GENERIC_RUNTIME_CONTRACT, NO_RUNTIME_CONTRACT } from "./runtime-contracts.js";
 import type { ProviderDescriptor } from "./execution-provider-registry.js";
 import {
@@ -48,15 +52,17 @@ export interface DockerProviderOptions {
  * 该适配器只翻译 Provider 合同，重建 rename、回滚和锁恢复仍由经过故障矩阵验证的
  * DockerCliRuntime 拥有，避免在抽象迁移时复制第二套事务实现。
  */
-export class DockerProviderAdapter implements
-  ExecutionControlPort,
-  ExecutionTransactionPort,
-  WorkspaceStorageBindingResolver,
-  WorkspaceStorageReleasePort,
-  AccessTargetResolver,
-  ProviderMetricsPort,
-  ProviderDiagnosticsPort,
-  ProviderHealthPort {
+export class DockerProviderAdapter
+  implements
+    ExecutionControlPort,
+    ExecutionTransactionPort,
+    WorkspaceStorageBindingResolver,
+    WorkspaceStorageReleasePort,
+    AccessTargetResolver,
+    ProviderMetricsPort,
+    ProviderDiagnosticsPort,
+    ProviderHealthPort
+{
   readonly providerId = "docker";
   readonly descriptor: ProviderDescriptor;
   readonly #runtime: ContainerRuntime;
@@ -107,8 +113,8 @@ export class DockerProviderAdapter implements
       );
     }
     if (
-      request.providerId !== this.providerId
-      || (request.storageRef.affinity && request.storageRef.affinity.providerId !== this.providerId)
+      request.providerId !== this.providerId ||
+      (request.storageRef.affinity && request.storageRef.affinity.providerId !== this.providerId)
     ) {
       throw new ProviderOperationError(
         "provider_storage_affinity_mismatch",
@@ -134,11 +140,7 @@ export class DockerProviderAdapter implements
   async observe(request: ExecutionObservationRequest): Promise<ProviderExecution | null> {
     request.signal?.throwIfAborted();
     try {
-      const instance = await this.#runtime.get(
-        request.workspaceId,
-        request.signal,
-        request.storageBindings,
-      );
+      const instance = await this.#runtime.get(request.workspaceId, request.signal, request.storageBindings);
       request.signal?.throwIfAborted();
       verifyOwner(instance, request.expectedOwnerId);
       return instance ? providerExecution(instance) : null;
@@ -164,20 +166,12 @@ export class DockerProviderAdapter implements
     request.signal?.throwIfAborted();
     assertProviderRequestSupported(this.descriptor, providerRequestFromReconcile(request), "reconcile");
     try {
-      const current = await this.#runtime.get(
-        request.workspaceId,
-        request.signal,
-        request.storageBindings,
-      );
+      const current = await this.#runtime.get(request.workspaceId, request.signal, request.storageBindings);
       verifyOwner(current, request.ownerId);
       let instance: ContainerInstance;
       if (request.replace) {
         if (!this.#runtime.rebuild) {
-          throw new ProviderOperationError(
-            "provider_rebuild_unsupported",
-            "permanent",
-            "reconcile",
-          );
+          throw new ProviderOperationError("provider_rebuild_unsupported", "permanent", "reconcile");
         }
         instance = await this.#runtime.rebuild(runtimeRequest(request));
       } else if (!current) {
@@ -237,14 +231,22 @@ export class DockerProviderAdapter implements
     request.signal?.throwIfAborted();
     assertProviderStorageSupported(this.descriptor, request.storageRef.storageClass, "release_storage");
     if (!this.#runtime.releaseWorkspaceStorage) {
-      throw new ProviderOperationError("provider_storage_release_unsupported", "permanent", "release_storage");
+      throw new ProviderOperationError(
+        "provider_storage_release_unsupported",
+        "permanent",
+        "release_storage",
+      );
     }
     if (
-      request.providerId !== this.providerId
-      || request.storageRef.affinity?.providerId !== this.providerId
-      || request.binding.storageId !== request.storageRef.id
+      request.providerId !== this.providerId ||
+      request.storageRef.affinity?.providerId !== this.providerId ||
+      request.binding.storageId !== request.storageRef.id
     ) {
-      throw new ProviderOperationError("provider_storage_release_identity_mismatch", "inconsistent", "release_storage");
+      throw new ProviderOperationError(
+        "provider_storage_release_identity_mismatch",
+        "inconsistent",
+        "release_storage",
+      );
     }
     try {
       await this.#runtime.releaseWorkspaceStorage({
@@ -272,11 +274,7 @@ export class DockerProviderAdapter implements
     }
   }
 
-  async inspectTransaction(
-    workspaceId: string,
-    transactionId: string,
-    signal?: AbortSignal,
-  ) {
+  async inspectTransaction(workspaceId: string, transactionId: string, signal?: AbortSignal) {
     if (!this.#runtime.inspectRebuildTransaction) return null;
     try {
       const inspection = await this.#runtime.inspectRebuildTransaction(workspaceId, transactionId, signal);
@@ -342,14 +340,16 @@ export class DockerProviderAdapter implements
     }
   }
 
-  async readProviderHealth(): Promise<ProviderCapabilityResult<{
-    providerId: string;
-    available: boolean;
-    version?: string;
-    host?: string;
-    platform?: string;
-    architecture?: string;
-  }>> {
+  async readProviderHealth(): Promise<
+    ProviderCapabilityResult<{
+      providerId: string;
+      available: boolean;
+      version?: string;
+      host?: string;
+      platform?: string;
+      architecture?: string;
+    }>
+  > {
     if (!this.#runtime.status) return { status: "unsupported" };
     try {
       const status = await this.#runtime.status();
@@ -414,11 +414,7 @@ function providerExecution(instance: ContainerInstance): ProviderExecution {
 
 function verifyOwner(instance: ContainerInstance | null, expectedOwnerId: string): void {
   if (instance && instance.ownerId !== expectedOwnerId) {
-    throw new ProviderOperationError(
-      "provider_environment_owner_mismatch",
-      "inconsistent",
-      "reconcile",
-    );
+    throw new ProviderOperationError("provider_environment_owner_mismatch", "inconsistent", "reconcile");
   }
 }
 
@@ -441,17 +437,23 @@ function normalizeProviderError(
   signal?: AbortSignal,
 ): ProviderOperationError {
   if (error instanceof ProviderOperationError) return error;
-  if (error instanceof ManagedResourceResolutionError) {
+  const safetyError = findContainerRuntimeSafetyError(error);
+  if (safetyError) {
     return new ProviderOperationError(
-      error.code,
-      "permanent",
+      safetyError.code,
+      safetyError.code === "runtime_recovery_blocked" ? "inconsistent" : "transient",
       phase,
-      undefined,
+      safetyError.code === "runtime_probe_unavailable" ? 5_000 : undefined,
       { cause: error },
     );
   }
+  if (error instanceof ManagedResourceResolutionError) {
+    return new ProviderOperationError(error.code, "permanent", phase, undefined, { cause: error });
+  }
   if (signal?.aborted || isAbortError(error)) {
-    return new ProviderOperationError("provider_operation_cancelled", "cancelled", phase, undefined, { cause: error });
+    return new ProviderOperationError("provider_operation_cancelled", "cancelled", phase, undefined, {
+      cause: error,
+    });
   }
   return new ProviderOperationError("provider_operation_failed", "transient", phase, 1_000, { cause: error });
 }

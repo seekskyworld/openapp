@@ -102,11 +102,7 @@ export interface ContainerInstance {
  * Docker 当前 artifacts 对指定 rebuild 代次的证明结果。`not_found` 只表示
  * 证明已不存在；调用方必须结合持久化 source/target 快照判断是否已回滚。
  */
-export type ContainerRebuildTransactionStatus =
-  | "pending"
-  | "committed"
-  | "not_found"
-  | "inconsistent";
+export type ContainerRebuildTransactionStatus = "pending" | "committed" | "not_found" | "inconsistent";
 
 export interface ContainerRebuildTransactionInspection {
   status: ContainerRebuildTransactionStatus;
@@ -114,6 +110,30 @@ export interface ContainerRebuildTransactionInspection {
 }
 
 export type DeferredCandidateAcceptance = "accepted" | "already_baseline" | "not_found";
+
+export class ContainerRuntimeSafetyError extends Error {
+  constructor(
+    readonly code: "runtime_probe_unavailable" | "runtime_recovery_blocked",
+    options?: ErrorOptions,
+  ) {
+    super(code, options);
+    this.name = "ContainerRuntimeSafetyError";
+  }
+}
+
+export function findContainerRuntimeSafetyError(error: unknown): ContainerRuntimeSafetyError | undefined {
+  const pending: unknown[] = [error];
+  const seen = new Set<unknown>();
+  while (pending.length) {
+    const current = pending.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    if (current instanceof ContainerRuntimeSafetyError) return current;
+    if (current instanceof Error) pending.push(current.cause);
+    if (current instanceof AggregateError) pending.push(...current.errors);
+  }
+  return undefined;
+}
 
 export class ContainerRebuildRollbackError extends Error {
   readonly recoveredInstance: ContainerInstance;
@@ -219,5 +239,13 @@ export interface ContainerRuntime {
   removeImageIfCurrent?(reference: string, expectedImageId: string): Promise<boolean>;
   pullImage?(reference: string): Promise<void>;
   loadImage?(archivePath: string, reference: string): Promise<void>;
-  status?(): Promise<{ runtime: string; available: boolean; version?: string; host?: string; platform?: string; architecture?: string; error?: string }>;
+  status?(): Promise<{
+    runtime: string;
+    available: boolean;
+    version?: string;
+    host?: string;
+    platform?: string;
+    architecture?: string;
+    error?: string;
+  }>;
 }

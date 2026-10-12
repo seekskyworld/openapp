@@ -43,7 +43,7 @@ export const DEFAULT_NETWORK_POOL_CIDR = "10.240.0.0/12";
 export const DEFAULT_NETWORK_SUBNET_PREFIX = 28;
 export const DEFAULT_RESOURCE_SCHEME = "2";
 export const IMAGE_SMOKE_HEALTH_PROBE = (port: number, path: string) =>
-  `const deadline=Date.now()+45000;const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));(async()=>{while(Date.now()<deadline){try{const response=await fetch(${JSON.stringify(`http://127.0.0.1:${port}${path}`)},{signal:AbortSignal.timeout(2000)});if(response.ok)process.exit(0)}catch{}await pause(500)}process.exit(1)})()`;
+  `const deadline=Date.now()+45000;const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));(async()=>{while(Date.now()<deadline){try{const response=await fetch(${JSON.stringify(`http://127.0.0.1:${port}${path}`)},{signal:AbortSignal.timeout(2000)});if(response.ok)process.exit(0)}catch{}await pause(500)}process.exit(42)})()`;
 export const REBUILD_ARTIFACT_SUFFIX = /-rebuild-(next|previous|rollback)$/u;
 export interface CommandResult {
   stdout: string;

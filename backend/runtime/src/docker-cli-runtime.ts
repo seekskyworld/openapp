@@ -3,6 +3,8 @@ import { withRuntimeCleanup } from "./runtime-cleanup.js";
 import {
   ContainerArtifactValidationError,
   ContainerRebuildRollbackError,
+  ContainerRuntimeSafetyError,
+  findContainerRuntimeSafetyError,
   GENERIC_RUNTIME_CONTRACT,
   NO_RUNTIME_CONTRACT,
   type ContainerActivityMetrics,
@@ -507,7 +509,11 @@ export class DockerCliRuntime implements ContainerRuntime {
       }
     }
     if (instance && recoveredCatalogSnapshot) {
-      instance = { ...instance, catalogSnapshot: recoveredCatalogSnapshot, rebuildRecovered };
+      instance = {
+        ...instance,
+        catalogSnapshot: instance.catalogSnapshot ?? recoveredCatalogSnapshot,
+        rebuildRecovered,
+      };
     } else if (instance && rebuildRecovered) {
       instance = { ...instance, rebuildRecovered };
     }
@@ -570,6 +576,7 @@ export class DockerCliRuntime implements ContainerRuntime {
     if (previous) {
       const stagedRebuild = this.#requireStagedReplacement(canonical, previous);
       if (previous.state === "running") throw new Error("rebuild predecessor is still running");
+      await this.#requireProbeImage(signal);
       try {
         if (canonical.state !== "running") await this.#docker(["start", canonicalName], signal);
         await this.#probeContainerHealth(canonicalName, signal);
@@ -582,6 +589,7 @@ export class DockerCliRuntime implements ContainerRuntime {
         );
       } catch (error) {
         if (signal?.aborted) throw signal.reason;
+        if (findContainerRuntimeSafetyError(error)) throw error;
         try {
           await this.#fenceFailedCandidate(
             instanceId,
@@ -599,7 +607,7 @@ export class DockerCliRuntime implements ContainerRuntime {
           const recovered = await this.#require(instanceId, signal, boundStorage);
           throw new ContainerRebuildRollbackError(
             error,
-            canonical.rebuild?.sourceCatalogSnapshot
+            !recovered.catalogSnapshot && canonical.rebuild?.sourceCatalogSnapshot
               ? { ...recovered, catalogSnapshot: canonical.rebuild.sourceCatalogSnapshot }
               : recovered,
           );
@@ -660,6 +668,7 @@ export class DockerCliRuntime implements ContainerRuntime {
     const signal = request.signal;
     signal?.throwIfAborted();
     if (request.appId) requireAppId(request.appId);
+    if (request.start !== false) await this.#requireProbeImage(signal);
     const recoveredCatalogSnapshot = await this.#recoverRebuildArtifacts(
       instanceId,
       ownerId,
@@ -670,7 +679,7 @@ export class DockerCliRuntime implements ContainerRuntime {
     );
     let existing = await this.#get(instanceId, signal, boundStorage);
     if (existing && recoveredCatalogSnapshot) {
-      existing = { ...existing, catalogSnapshot: recoveredCatalogSnapshot };
+      existing = { ...existing, catalogSnapshot: existing.catalogSnapshot ?? recoveredCatalogSnapshot };
     }
     if (existing && existing.ownerId !== ownerId) throw new Error("container ownership mismatch");
     const launchProfile = this.#launchProfile(request);
@@ -697,6 +706,21 @@ export class DockerCliRuntime implements ContainerRuntime {
       return "not_found";
     const rebuild = this.#requireStagedReplacement(artifacts.canonical, artifacts.previous);
     if (rebuild.startRequested || artifacts.canonical.state === "running") return "not_found";
+    if (artifacts.previous.state === "running") throw new Error("rebuild predecessor is still running");
+    // Complete the lock handoff while both generations still prove ownership.
+    // Otherwise repeated stopped upgrades can discard the only authorized holder.
+    await this.#recoverStateLocks(
+      instanceId,
+      ownerId,
+      [artifacts.previous.runtimeId, artifacts.canonical.runtimeId],
+      rebuild.id,
+      artifacts.canonical.catalogSnapshot?.imageReference,
+      this.#workspaceStorageBinding(instanceId, undefined),
+      signal,
+      [artifacts.previous.containerHostname, artifacts.canonical.containerHostname].filter(
+        (host): host is string => Boolean(host),
+      ),
+    );
     // 只删除已证明属于上一代的 previous。删完后 canonical 候选即成为新基线，
     // 后续 rebuild 的 predecessor 会自然指向它；用户 Volume 始终保留。
     await this.#removeRebuildPredecessor(instanceId, ownerId, artifacts.canonical.runtimeId, rebuild, signal);
@@ -780,6 +804,7 @@ export class DockerCliRuntime implements ContainerRuntime {
       }
     } catch (error) {
       if (signal?.aborted) throw signal.reason;
+      if (findContainerRuntimeSafetyError(error)) throw error;
       return this.#rollbackStagedRebuild(transaction, progress, error);
     }
   }
@@ -816,7 +841,7 @@ export class DockerCliRuntime implements ContainerRuntime {
       const recovered = await this.#require(instanceId, signal);
       throw new ContainerRebuildRollbackError(
         originalError,
-        rebuild.sourceCatalogSnapshot
+        !recovered.catalogSnapshot && rebuild.sourceCatalogSnapshot
           ? { ...recovered, catalogSnapshot: rebuild.sourceCatalogSnapshot }
           : recovered,
       );
@@ -1768,35 +1793,54 @@ export class DockerCliRuntime implements ContainerRuntime {
     return labels;
   }
 
+  async #requireProbeImage(signal?: AbortSignal): Promise<void> {
+    try {
+      await this.#docker(["image", "inspect", this.#config.probeImage ?? "node:24-bookworm-slim"], signal);
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason;
+      throw new ContainerRuntimeSafetyError("runtime_probe_unavailable", { cause: error });
+    }
+  }
+
   async #probeContainerHealth(name: string, signal?: AbortSignal): Promise<void> {
+    await this.#requireProbeImage(signal);
     const probeName = `openapp-health-probe-${randomUUID()}`;
     await withRuntimeCleanup(
       async () => {
-        await this.#docker(
-          [
-            "run",
-            "--rm",
-            "--name",
-            probeName,
-            "--network",
-            `container:${name}`,
-            "--read-only",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges=true",
-            "--pids-limit",
-            "64",
-            "--memory",
-            "128m",
-            "--entrypoint",
-            "node",
-            this.#config.probeImage ?? "node:24-bookworm-slim",
-            "-e",
-            IMAGE_SMOKE_HEALTH_PROBE(this.#profile().containerPort, this.#profile().healthPath),
-          ],
-          signal,
-        );
+        try {
+          await this.#docker(
+            [
+              "run",
+              "--rm",
+              "--pull=never",
+              "--name",
+              probeName,
+              "--network",
+              `container:${name}`,
+              "--read-only",
+              "--cap-drop",
+              "ALL",
+              "--security-opt",
+              "no-new-privileges=true",
+              "--pids-limit",
+              "64",
+              "--memory",
+              "128m",
+              "--entrypoint",
+              "node",
+              this.#config.probeImage ?? "node:24-bookworm-slim",
+              "-e",
+              IMAGE_SMOKE_HEALTH_PROBE(this.#profile().containerPort, this.#profile().healthPath),
+            ],
+            signal,
+          );
+        } catch (error) {
+          if (signal?.aborted) throw signal.reason;
+          // Only the probe program's dedicated exit code proves an unhealthy App.
+          if (error instanceof Error && (error as Error & { dockerExitCode?: number }).dockerExitCode === 42)
+            throw error;
+          throw new ContainerRuntimeSafetyError("runtime_probe_unavailable", { cause: error });
+        }
       },
       async () => {
         // CLI 被取消时容器可能仍在运行，清理不继承取消信号；只处理本次唯一探针。
@@ -1889,36 +1933,44 @@ export class DockerCliRuntime implements ContainerRuntime {
         [storageBinding.attachmentRef],
       );
     }
-    await this.#docker(
-      [
-        "run",
-        "--rm",
-        "--network",
-        "none",
-        "--read-only",
-        "--cap-drop",
-        "ALL",
-        "--security-opt",
-        "no-new-privileges=true",
-        "--pids-limit",
-        "64",
-        "--memory",
-        "128m",
-        ...this.#labelArgs(instanceId, ownerId),
-        "--mount",
-        `type=volume,source=${volume.Name},target=${storageBinding.mountPath}`,
-        "--env",
-        `${this.#envName("containers")}=${ids.join(",")}`,
-        ...(hostnames.length > 0 ? ["--env", `${this.#envName("hosts")}=${hostnames.join(",")}`] : []),
-        "--env",
-        `${this.#envName("recoveryId")}=${recoveryId}`,
-        "--entrypoint",
-        recoveryCommand[0]!,
-        recoveryImageReference ?? this.#config.image,
-        ...recoveryCommand.slice(1),
-      ],
-      signal,
-    );
+    try {
+      await this.#docker(
+        [
+          "run",
+          "--rm",
+          "--network",
+          "none",
+          "--read-only",
+          "--cap-drop",
+          "ALL",
+          "--security-opt",
+          "no-new-privileges=true",
+          "--pids-limit",
+          "64",
+          "--memory",
+          "128m",
+          ...this.#labelArgs(instanceId, ownerId),
+          "--mount",
+          `type=volume,source=${volume.Name},target=${storageBinding.mountPath}`,
+          "--env",
+          `${this.#envName("containers")}=${ids.join(",")}`,
+          ...(hostnames.length > 0 ? ["--env", `${this.#envName("hosts")}=${hostnames.join(",")}`] : []),
+          "--env",
+          `${this.#envName("recoveryId")}=${recoveryId}`,
+          "--entrypoint",
+          recoveryCommand[0]!,
+          recoveryImageReference ?? this.#config.image,
+          ...recoveryCommand.slice(1),
+        ],
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason;
+      if (error instanceof Error && (error as Error & { dockerExitCode?: number }).dockerExitCode === 1) {
+        throw new ContainerRuntimeSafetyError("runtime_recovery_blocked", { cause: error });
+      }
+      throw error;
+    }
   }
 
   async #fenceFailedCandidate(
@@ -2454,8 +2506,9 @@ export class DockerCliRuntime implements ContainerRuntime {
     if (canonical.state !== "running" || !canonical.rebuild) return false;
     try {
       await this.#probeContainerHealth(context.artifacts.names.canonical, context.signal);
-    } catch {
+    } catch (error) {
       if (context.signal?.aborted) throw context.signal.reason;
+      if (findContainerRuntimeSafetyError(error)) throw error;
       return false;
     }
     try {

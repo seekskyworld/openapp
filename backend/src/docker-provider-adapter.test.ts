@@ -3,13 +3,37 @@ import test from "node:test";
 
 import { DockerProviderAdapter } from "./docker-provider-adapter.js";
 import type { ContainerInstance, ContainerRuntime } from "./runtime.js";
+import { ContainerRuntimeSafetyError } from "./runtime.js";
+import { ProviderOperationError } from "./execution-provider.js";
 import { createContainerRuntimeStub } from "./testing/container-runtime-stub.js";
+
+for (const code of ["runtime_recovery_blocked", "runtime_probe_unavailable"] as const) {
+  test(`Docker provider preserves ${code} through aggregate cleanup errors`, async () => {
+    const runtime = runtimeStub({
+      async get() {
+        throw new AggregateError(
+          [new ContainerRuntimeSafetyError(code), new Error("cleanup failed")],
+          "operation failed",
+        );
+      },
+    });
+    await assert.rejects(
+      new DockerProviderAdapter(runtime).reconcile(reconcileRequest()),
+      (error: unknown) =>
+        error instanceof ProviderOperationError &&
+        error.code === code &&
+        error.failureClass === (code === "runtime_recovery_blocked" ? "inconsistent" : "transient"),
+    );
+  });
+}
 
 test("Docker provider reconcile provisions once and returns no access endpoint", async () => {
   let instance: ContainerInstance | null = null;
   let provisions = 0;
   const runtime = runtimeStub({
-    async get() { return instance; },
+    async get() {
+      return instance;
+    },
     async provision(request) {
       provisions += 1;
       instance = runtimeInstance({
@@ -35,7 +59,9 @@ test("Docker provider reconcile provisions once and returns no access endpoint",
 test("Docker provider reconcile preserves stopped rebuild intent and transaction fencing", async () => {
   const rebuilds: unknown[] = [];
   const runtime = runtimeStub({
-    async get() { return runtimeInstance(); },
+    async get() {
+      return runtimeInstance();
+    },
     async rebuild(request) {
       rebuilds.push(structuredClone({ ...request, signal: undefined }));
       return runtimeInstance({ runtimeId: "docker-environment-rebuilt", state: "stopped", endpoint: null });
@@ -52,35 +78,39 @@ test("Docker provider reconcile preserves stopped rebuild intent and transaction
 
   assert.equal(result.status, "awaiting_first_start");
   assert.equal(result.execution.observedState, "stopped");
-  assert.deepEqual(rebuilds, [{
-    instanceId: request.workspaceId,
-    ownerId: request.ownerId,
-    appId: request.appId,
-    appVersionId: request.appRevisionId,
-    imageArtifactId: request.launchArtifactId,
-    imageReference: request.launchArtifactReference,
-    sourceCatalogSnapshot: request.sourceCatalogSnapshot,
-    launchProfile: request.launchProfile,
-    storageBindings: request.storageBindings,
-    start: false,
-    rebuildTransactionId: request.transactionId,
-    signal: undefined,
-  }]);
+  assert.deepEqual(rebuilds, [
+    {
+      instanceId: request.workspaceId,
+      ownerId: request.ownerId,
+      appId: request.appId,
+      appVersionId: request.appRevisionId,
+      imageArtifactId: request.launchArtifactId,
+      imageReference: request.launchArtifactReference,
+      sourceCatalogSnapshot: request.sourceCatalogSnapshot,
+      launchProfile: request.launchProfile,
+      storageBindings: request.storageBindings,
+      start: false,
+      rebuildTransactionId: request.transactionId,
+      signal: undefined,
+    },
+  ]);
 });
 
 test("Docker storage resolution maps a stable WorkspaceStorageRef through the Runtime boundary", async () => {
   const requests: unknown[] = [];
-  const adapter = new DockerProviderAdapter(runtimeStub({
-    async resolveStorageBinding(request) {
-      requests.push(structuredClone({ ...request, signal: undefined }));
-      return {
-        storageId: request.storageId,
-        attachmentRef: "provider-volume-workspace",
-        mountPath: "/var/lib/sample-app",
-        readOnly: false,
-      };
-    },
-  }));
+  const adapter = new DockerProviderAdapter(
+    runtimeStub({
+      async resolveStorageBinding(request) {
+        requests.push(structuredClone({ ...request, signal: undefined }));
+        return {
+          storageId: request.storageId,
+          attachmentRef: "provider-volume-workspace",
+          mountPath: "/var/lib/sample-app",
+          readOnly: false,
+        };
+      },
+    }),
+  );
 
   const binding = await adapter.resolveStorageBinding({
     workspaceId: "provider-workspace",
@@ -99,30 +129,37 @@ test("Docker storage resolution maps a stable WorkspaceStorageRef through the Ru
     mountPath: "/var/lib/sample-app",
     readOnly: false,
   });
-  assert.deepEqual(requests, [{
-    workspaceId: "provider-workspace",
-    ownerId: "provider-owner",
-    storageId: "workspace-storage:provider-workspace",
-    storageClass: "workspace-data",
-    affinityProviderId: "docker",
-    affinityRegion: undefined,
-    signal: undefined,
-  }]);
-  await assert.rejects(adapter.resolveStorageBinding({
-    workspaceId: "provider-workspace",
-    ownerId: "provider-owner",
-    providerId: "docker",
-    storageRef: {
-      id: "workspace-storage:provider-workspace",
+  assert.deepEqual(requests, [
+    {
+      workspaceId: "provider-workspace",
+      ownerId: "provider-owner",
+      storageId: "workspace-storage:provider-workspace",
       storageClass: "workspace-data",
-      affinity: { providerId: "daytona" },
+      affinityProviderId: "docker",
+      affinityRegion: undefined,
+      signal: undefined,
     },
-  }), /provider_storage_affinity_mismatch/u);
+  ]);
+  await assert.rejects(
+    adapter.resolveStorageBinding({
+      workspaceId: "provider-workspace",
+      ownerId: "provider-owner",
+      providerId: "docker",
+      storageRef: {
+        id: "workspace-storage:provider-workspace",
+        storageClass: "workspace-data",
+        affinity: { providerId: "daytona" },
+      },
+    }),
+    /provider_storage_affinity_mismatch/u,
+  );
 });
 
 test("Docker access targets are resolved independently and validate owner plus protocol", async () => {
   const runtime = runtimeStub({
-    async observe() { return runtimeInstance(); },
+    async observe() {
+      return runtimeInstance();
+    },
   });
   const adapter = new DockerProviderAdapter(runtime);
   const target = await adapter.resolveAccessTarget({
@@ -137,9 +174,13 @@ test("Docker access targets are resolved independently and validate owner plus p
   assert.equal(target.expiresAt, null);
 
   await assert.rejects(
-    new DockerProviderAdapter(runtimeStub({
-      async observe() { return runtimeInstance({ ownerId: "foreign-owner" }); },
-    })).resolveAccessTarget({
+    new DockerProviderAdapter(
+      runtimeStub({
+        async observe() {
+          return runtimeInstance({ ownerId: "foreign-owner" });
+        },
+      }),
+    ).resolveAccessTarget({
       workspaceId: "provider-workspace",
       expectedOwnerId: "provider-owner",
       logicalService: "workspace_ui",
@@ -147,9 +188,13 @@ test("Docker access targets are resolved independently and validate owner plus p
     /provider_environment_owner_mismatch/u,
   );
   await assert.rejects(
-    new DockerProviderAdapter(runtimeStub({
-      async observe() { return runtimeInstance({ endpoint: "file:///tmp/not-an-upstream" }); },
-    })).resolveAccessTarget({
+    new DockerProviderAdapter(
+      runtimeStub({
+        async observe() {
+          return runtimeInstance({ endpoint: "file:///tmp/not-an-upstream" });
+        },
+      }),
+    ).resolveAccessTarget({
       workspaceId: "provider-workspace",
       expectedOwnerId: "provider-owner",
       logicalService: "workspace_ui",
@@ -161,12 +206,14 @@ test("Docker access targets are resolved independently and validate owner plus p
 test("Docker provider forwards AbortSignal and reports unsupported optional capabilities", async () => {
   const controller = new AbortController();
   const observedSignals: AbortSignal[] = [];
-  const adapter = new DockerProviderAdapter(runtimeStub({
-    async get(_id, signal) {
-      if (signal) observedSignals.push(signal);
-      return runtimeInstance();
-    },
-  }));
+  const adapter = new DockerProviderAdapter(
+    runtimeStub({
+      async get(_id, signal) {
+        if (signal) observedSignals.push(signal);
+        return runtimeInstance();
+      },
+    }),
+  );
   await adapter.reconcile({ ...reconcileRequest(), signal: controller.signal });
   assert.deepEqual(observedSignals, [controller.signal]);
   assert.deepEqual(await adapter.readMetrics("provider-workspace"), { status: "unsupported" });
@@ -175,14 +222,16 @@ test("Docker provider forwards AbortSignal and reports unsupported optional capa
 
 test("Docker provider keeps Environment removal separate from Workspace storage release", async () => {
   const calls: unknown[] = [];
-  const adapter = new DockerProviderAdapter(runtimeStub({
-    async removeEnvironment(request) {
-      calls.push(["environment", structuredClone({ ...request, signal: undefined })]);
-    },
-    async releaseWorkspaceStorage(request) {
-      calls.push(["storage", structuredClone({ ...request, signal: undefined })]);
-    },
-  }));
+  const adapter = new DockerProviderAdapter(
+    runtimeStub({
+      async removeEnvironment(request) {
+        calls.push(["environment", structuredClone({ ...request, signal: undefined })]);
+      },
+      async releaseWorkspaceStorage(request) {
+        calls.push(["storage", structuredClone({ ...request, signal: undefined })]);
+      },
+    }),
+  );
   const storageRef = {
     id: "workspace-storage:provider-workspace",
     storageClass: "workspace-data",
@@ -203,26 +252,35 @@ test("Docker provider keeps Environment removal separate from Workspace storage 
   });
 
   assert.deepEqual(calls, [
-    ["environment", {
-      instanceId: "provider-workspace",
-      ownerId: "provider-owner",
-      storageBindings: reconcileRequest().storageBindings,
-      signal: undefined,
-    }],
-    ["storage", {
-      instanceId: "provider-workspace",
-      ownerId: "provider-owner",
-      storageBindings: reconcileRequest().storageBindings,
-      signal: undefined,
-    }],
+    [
+      "environment",
+      {
+        instanceId: "provider-workspace",
+        ownerId: "provider-owner",
+        storageBindings: reconcileRequest().storageBindings,
+        signal: undefined,
+      },
+    ],
+    [
+      "storage",
+      {
+        instanceId: "provider-workspace",
+        ownerId: "provider-owner",
+        storageBindings: reconcileRequest().storageBindings,
+        signal: undefined,
+      },
+    ],
   ]);
-  await assert.rejects(adapter.releaseWorkspaceStorage({
-    workspaceId: "provider-workspace",
-    ownerId: "provider-owner",
-    providerId: "docker",
-    storageRef,
-    binding: { ...reconcileRequest().storageBindings[0]!, storageId: "workspace-storage:foreign" },
-  }), /provider_storage_release_identity_mismatch/u);
+  await assert.rejects(
+    adapter.releaseWorkspaceStorage({
+      workspaceId: "provider-workspace",
+      ownerId: "provider-owner",
+      providerId: "docker",
+      storageRef,
+      binding: { ...reconcileRequest().storageBindings[0]!, storageId: "workspace-storage:foreign" },
+    }),
+    /provider_storage_release_identity_mismatch/u,
+  );
 });
 
 function runtimeStub(overrides: Partial<ContainerRuntime>): ContainerRuntime {
@@ -249,12 +307,14 @@ function reconcileRequest() {
       environment: {},
       configFiles: [],
     },
-    storageBindings: [{
-      storageId: "workspace-storage:provider-workspace",
-      attachmentRef: "test-data-provider-workspace",
-      mountPath: "/var/lib/sample-app",
-      readOnly: false,
-    }],
+    storageBindings: [
+      {
+        storageId: "workspace-storage:provider-workspace",
+        attachmentRef: "test-data-provider-workspace",
+        mountPath: "/var/lib/sample-app",
+        readOnly: false,
+      },
+    ],
     desiredState: "running" as const,
     desiredGeneration: 2,
     transactionId: "provider-transaction",

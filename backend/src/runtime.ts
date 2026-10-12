@@ -29,6 +29,8 @@ export type {
 } from "@openapp/container-runtime";
 export {
   ContainerArtifactValidationError,
+  ContainerRuntimeSafetyError,
+  findContainerRuntimeSafetyError,
   ContainerRebuildRollbackError,
   ManagedResourceResolutionError,
   NO_RUNTIME_CONTRACT,
@@ -56,10 +58,12 @@ export interface ContainerRuntimeOptions {
 }
 
 export function createContainerRuntime(options: ContainerRuntimeOptions = {}): ContainerRuntime {
-  return new DockerCliRuntime(dockerCliRuntimeConfigFromEnv(
-    options.environment ?? process.env,
-    { compatibilityMode: options.compatibilityMode, profile: options.profile },
-  ));
+  return new DockerCliRuntime(
+    dockerCliRuntimeConfigFromEnv(options.environment ?? process.env, {
+      compatibilityMode: options.compatibilityMode,
+      profile: options.profile,
+    }),
+  );
 }
 
 /**

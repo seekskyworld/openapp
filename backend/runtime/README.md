@@ -99,6 +99,19 @@ deployments must import it or configure a trusted Node-capable mirror image
 An unavailable probe fails validation; it is never treated as a healthy workload.
 Workload images do not need Node or other probe utilities installed.
 
+Replacement checks require the probe image to exist locally and run it with
+`--pull=never`. `runtime_probe_unavailable` preserves the candidate and its
+predecessor for retry instead of rolling back a potentially healthy workload.
+Only the probe program's health-failure exit status authorizes that rollback.
+
+Before accepting a stopped candidate as the baseline for another upgrade, the
+Runtime runs the Adapter recovery command while both stopped generations still
+prove ownership. It deletes the predecessor only after this lock handoff succeeds.
+A recovery command that rejects the handoff yields `runtime_recovery_blocked`, an
+inconsistent Provider failure requiring attention rather than repeated upgrades.
+Unknown historical lock holders are not automatically authorized. Rollback results
+prefer the surviving container's catalog labels over older transaction snapshots.
+
 Image smoke tests mount a dedicated anonymous Volume at the profile data path,
 using Docker's normal image-directory copy-up to preserve ownership and initial
 content. Cleanup removes that Volume with the smoke container. Applications must
